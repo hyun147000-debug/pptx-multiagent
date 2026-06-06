@@ -1,0 +1,50 @@
+{
+  "name": "중앙부처 PPTX 기획·제작 파이프라인 (9 agents · 병렬)",
+  "nodes": [
+    { "parameters": {}, "id": "n0", "name": "주제·자료 입력", "type": "n8n-nodes-base.manualTrigger", "typeVersion": 1, "position": [0, 300] },
+
+    { "parameters": { "promptType": "define", "text": "발표 목적·청중·시간·분량·톤·마감 확정 → brief.md", "options": { "systemMessage": "pptx-intake (Sonnet 4.6)" } }, "id": "n1", "name": "① Intake (Sonnet)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [220, 300] },
+    { "parameters": { "formTitle": "Gate 0 · 발표 브리프 확정", "formFields": { "values": [ { "fieldLabel": "브리프 승인", "fieldType": "dropdown", "fieldOptions": { "values": [ { "option": "승인" }, { "option": "수정" } ] } } ] } }, "id": "n2", "name": "Gate 0 · 브리프 확정 (HITL)", "type": "n8n-nodes-base.form", "typeVersion": 1, "position": [440, 300] },
+
+    { "parameters": { "promptType": "define", "text": "insane-search로 콘텐츠·중앙부처 레퍼런스 수집, 데이터부록(출처) → research.md. HWP는 LibreOffice 변환.", "options": { "systemMessage": "pptx-researcher (Sonnet 4.6) · skill: insane-search" } }, "id": "n3", "name": "② Researcher (Sonnet)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [680, 180] },
+    { "parameters": { "promptType": "define", "text": "insane-design으로 사용자 제공 디자인 애셋 분석(색·타이포·레이아웃) → design-ref.md", "options": { "systemMessage": "pptx-design-analyst (Sonnet 4.6) · skill: insane-design" } }, "id": "n4", "name": "②' Design-Analyst (Sonnet)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [680, 420] },
+    { "parameters": { "promptType": "define", "text": "research.md 수치·출처 검증(insane-search) → factcheck.md. ❌ 0건이어야 통과.", "options": { "systemMessage": "pptx-factchecker (Sonnet 4.6)" } }, "id": "n5", "name": "③ Fact-Check (Sonnet)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [920, 180] },
+
+    { "parameters": { "promptType": "define", "text": "발표유형 판단 + 슬라이드 설계(비주얼의도·이미지요구·발표자노트) → plan.md, script.md", "options": { "systemMessage": "pptx-planner (Opus 4.8)" } }, "id": "n6", "name": "④ Planner (Opus)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [1160, 300] },
+    { "parameters": { "promptType": "define", "text": "기획안 5축 다관점 평가 → review.md, score. 출처없는 수치=hard-fail.", "options": { "systemMessage": "pptx-reviewer (Opus 4.8)" } }, "id": "n7", "name": "⑤ Reviewer (Opus)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [1400, 300] },
+    { "parameters": { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [ { "leftValue": "={{ $json.score }}", "rightValue": 80, "operator": { "type": "number", "operation": "gte" } } ], "combinator": "and" } }, "id": "n8", "name": "기획안 ≥ 80?", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [1640, 300] },
+    { "parameters": { "formTitle": "Gate 1 · 기획안 확정", "formFields": { "values": [ { "fieldLabel": "기획안 승인", "fieldType": "dropdown", "fieldOptions": { "values": [ { "option": "승인" }, { "option": "보류" } ] } } ] } }, "id": "n9", "name": "Gate 1 · 기획안 확정 (HITL)", "type": "n8n-nodes-base.form", "typeVersion": 1, "position": [1880, 220] },
+
+    { "parameters": { "promptType": "define", "text": "디자인 3안 추천(design-ref 반영) → design.md", "options": { "systemMessage": "pptx-designer (Sonnet 4.6) · skill: pptx-design-styles" } }, "id": "n10", "name": "⑥ Designer (Sonnet)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [680, 640] },
+    { "parameters": { "promptType": "define", "text": "이미지 조달: 사용자 제공 또는 Codex 직접 생성 → assets/generated/, image-manifest.md", "options": { "systemMessage": "pptx-imagegen (Sonnet 4.6) · skill: codex-imagegen" } }, "id": "n11", "name": "⑦ Imagegen (Sonnet)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [680, 840] },
+    { "parameters": { "formTitle": "Gate 2+3 · 디자인 택1 + 필요요소", "formDescription": "디자인 3안 중 택1, 폰트·템플릿·로고·보유 이미지를 함께 확정.", "formFields": { "values": [ { "fieldLabel": "디자인 선택", "fieldType": "dropdown", "fieldOptions": { "values": [ { "option": "1안" }, { "option": "2안" }, { "option": "3안" } ] } }, { "fieldLabel": "한글 폰트", "fieldType": "text" }, { "fieldLabel": "기관 템플릿·로고", "fieldType": "file" } ] } }, "id": "n12", "name": "Gate 2+3 · 디자인·요소 (HITL)", "type": "n8n-nodes-base.form", "typeVersion": 1, "position": [920, 640] },
+
+    { "parameters": { "language": "python", "pythonCode": "# python-pptx로 plan.md+design.md+이미지(assets/generated) → output_vN.pptx\n# 정부양식(부처명/페이지/발표일), 편집가능 텍스트·표·차트, 한글폰트 임베딩\nfrom pptx import Presentation\nreturn items" }, "id": "n13", "name": "⑧ python-pptx 제작", "type": "n8n-nodes-base.code", "typeVersion": 2, "position": [1160, 740] },
+    { "parameters": { "promptType": "define", "text": "6축 검수(기획충실·디자인·가독·정확·기술·정부양식/접근성) → inspection.md, score. LibreOffice 렌더 시각검수. 치명결함=즉시미달.", "options": { "systemMessage": "pptx-inspector (Opus 4.8)" } }, "id": "n14", "name": "⑨ Inspector (Opus)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.7, "position": [1400, 740] },
+    { "parameters": { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [ { "leftValue": "={{ $json.score }}", "rightValue": 85, "operator": { "type": "number", "operation": "gte" } } ], "combinator": "and" } }, "id": "n15", "name": "산출물 ≥ 85?", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [1640, 740] },
+    { "parameters": { "formTitle": "Gate 4 · 최종 인수", "formFields": { "values": [ { "fieldLabel": "최종 인수", "fieldType": "dropdown", "fieldOptions": { "values": [ { "option": "인수" }, { "option": "반려" } ] } } ] } }, "id": "n16", "name": "Gate 4 · 최종 인수 (HITL)", "type": "n8n-nodes-base.form", "typeVersion": 1, "position": [1880, 740] },
+    { "parameters": { "assignments": { "assignments": [ { "name": "deliverable", "value": "output.pptx + script.md + decisions.md", "type": "string" } ] } }, "id": "n17", "name": "완료 · output.pptx", "type": "n8n-nodes-base.set", "typeVersion": 3.4, "position": [1880, 940] }
+  ],
+  "connections": {
+    "주제·자료 입력": { "main": [ [ { "node": "① Intake (Sonnet)", "type": "main", "index": 0 } ] ] },
+    "① Intake (Sonnet)": { "main": [ [ { "node": "Gate 0 · 브리프 확정 (HITL)", "type": "main", "index": 0 } ] ] },
+    "Gate 0 · 브리프 확정 (HITL)": { "main": [ [ { "node": "② Researcher (Sonnet)", "type": "main", "index": 0 }, { "node": "②' Design-Analyst (Sonnet)", "type": "main", "index": 0 } ] ] },
+    "② Researcher (Sonnet)": { "main": [ [ { "node": "③ Fact-Check (Sonnet)", "type": "main", "index": 0 } ] ] },
+    "③ Fact-Check (Sonnet)": { "main": [ [ { "node": "④ Planner (Opus)", "type": "main", "index": 0 } ] ] },
+    "②' Design-Analyst (Sonnet)": { "main": [ [ { "node": "④ Planner (Opus)", "type": "main", "index": 0 } ] ] },
+    "④ Planner (Opus)": { "main": [ [ { "node": "⑤ Reviewer (Opus)", "type": "main", "index": 0 } ] ] },
+    "⑤ Reviewer (Opus)": { "main": [ [ { "node": "기획안 ≥ 80?", "type": "main", "index": 0 } ] ] },
+    "기획안 ≥ 80?": { "main": [ [ { "node": "Gate 1 · 기획안 확정 (HITL)", "type": "main", "index": 0 } ], [ { "node": "④ Planner (Opus)", "type": "main", "index": 0 } ] ] },
+    "Gate 1 · 기획안 확정 (HITL)": { "main": [ [ { "node": "⑥ Designer (Sonnet)", "type": "main", "index": 0 }, { "node": "⑦ Imagegen (Sonnet)", "type": "main", "index": 0 } ] ] },
+    "⑥ Designer (Sonnet)": { "main": [ [ { "node": "Gate 2+3 · 디자인·요소 (HITL)", "type": "main", "index": 0 } ] ] },
+    "Gate 2+3 · 디자인·요소 (HITL)": { "main": [ [ { "node": "⑧ python-pptx 제작", "type": "main", "index": 0 } ] ] },
+    "⑦ Imagegen (Sonnet)": { "main": [ [ { "node": "⑧ python-pptx 제작", "type": "main", "index": 0 } ] ] },
+    "⑧ python-pptx 제작": { "main": [ [ { "node": "⑨ Inspector (Opus)", "type": "main", "index": 0 } ] ] },
+    "⑨ Inspector (Opus)": { "main": [ [ { "node": "산출물 ≥ 85?", "type": "main", "index": 0 } ] ] },
+    "산출물 ≥ 85?": { "main": [ [ { "node": "Gate 4 · 최종 인수 (HITL)", "type": "main", "index": 0 } ], [ { "node": "⑥ Designer (Sonnet)", "type": "main", "index": 0 } ] ] },
+    "Gate 4 · 최종 인수 (HITL)": { "main": [ [ { "node": "완료 · output.pptx", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "description": "9 에이전트. 병렬 P-A(리서치∥디자인분석)·P-C(디자인∥이미지생성). HITL 게이트 4개, 재작업 루프 2개(각 최대 3회). 스킬: insane-search·insane-design·codex-imagegen·pptx-design-styles." }
+}

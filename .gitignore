@@ -1,0 +1,14 @@
+# 의존성 (npm install로 재생성)
+node_modules/
+
+# 도구 캐시/임시
+.playwright-mcp/
+
+# 디자인 애셋 (로컬 보관, 공개 저장소 제외)
+assets/
+
+# PPTX 산출물·렌더 결과 (재생성 가능, 공개 저장소 제외)
+*.pptx
+*.pdf
+projects/**/img/
+**/_contact*.png

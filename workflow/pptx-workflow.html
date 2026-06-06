@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>중앙부처 PPTX 기획·제작 파이프라인 — n8n 워크플로우</title>
+<style>
+  :root{
+    --bg:#f4f4f8; --grid:#e0e0e8; --ink:#2d2e3a; --muted:#7a7b8a;
+    --card:#ffffff; --loop:#ff5a5f; --true:#23b26d;
+    --trigger:#ff6d5a; --ai:#7b5cff; --logic:#1fb8a6; --code:#3f7bff; --hitl:#ff9d3c; --output:#23b26d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);overflow:hidden}
+  .topbar{position:fixed;top:0;left:0;right:0;height:54px;background:#fff;border-bottom:1px solid #e3e3ec;
+    display:flex;align-items:center;gap:14px;padding:0 18px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.03)}
+  .topbar .dot{width:10px;height:10px;border-radius:50%;background:#ff6d5a;box-shadow:18px 0 #ffbf3c,36px 0 #23b26d}
+  .topbar h1{font-size:15px;font-weight:700;margin-left:34px}
+  .topbar .sub{font-size:12px;color:var(--muted)}
+  .topbar .spacer{flex:1}
+  .badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#f0f0f7;color:#555}
+  .canvas-wrap{position:absolute;inset:54px 0 0 0;overflow:auto}
+  .canvas{position:relative;width:2460px;height:1080px;margin:20px auto;
+    background-color:var(--bg);
+    background-image:radial-gradient(var(--grid) 1.3px, transparent 1.3px);
+    background-size:22px 22px;border-radius:12px}
+  svg.edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+  .pbox{position:absolute;border:2px dashed #b6a8ff;background:rgba(123,92,255,.05);border-radius:16px}
+  .pbox .ptag{position:absolute;top:-12px;left:14px;background:#7b5cff;color:#fff;font-size:11px;font-weight:700;
+    padding:3px 10px;border-radius:10px;white-space:nowrap}
+  .node{position:absolute;width:212px;background:var(--card);border:1px solid #e4e4ee;border-radius:12px;
+    box-shadow:0 2px 8px rgba(40,40,80,.07);display:flex;overflow:hidden;transition:transform .12s, box-shadow .12s}
+  .node:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(40,40,80,.16);z-index:10}
+  .node .icon{width:44px;flex:none;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff}
+  .node .body{padding:8px 10px;min-width:0}
+  .node .title{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .node .sub{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chips{margin-top:5px;display:flex;gap:4px;flex-wrap:wrap}
+  .chip{font-size:9px;font-weight:700;padding:2px 6px;border-radius:9px}
+  .chip.opus{background:#efe7ff;color:#6b3fd4} .chip.sonnet{background:#e4eeff;color:#3566cf}
+  .chip.skill{background:#eafaf2;color:#1c9e6b;border:1px solid #c7eedd}
+  .elabel{position:absolute;font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:12px;
+    transform:translate(-50%,-50%);white-space:nowrap;background:#fff;border:1px solid #eee;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .elabel.true{color:var(--true);border-color:#bdeacb} .elabel.false{color:var(--loop);border-color:#ffc9cb}
+  .legend{position:fixed;left:16px;bottom:16px;background:#fff;border:1px solid #e6e6f0;border-radius:12px;
+    padding:12px 14px;font-size:11.5px;box-shadow:0 4px 14px rgba(0,0,0,.08);z-index:40}
+  .legend h4{font-size:11px;color:var(--muted);margin-bottom:8px;letter-spacing:.4px;text-transform:uppercase}
+  .legend .row{display:flex;align-items:center;gap:8px;margin:5px 0}
+  .legend .sw{width:14px;height:14px;border-radius:4px}
+  .stage{position:absolute;font-size:11px;font-weight:800;color:#b9bacb;letter-spacing:2px}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="dot"></div>
+    <h1>중앙부처 PPTX 기획·제작 파이프라인</h1>
+    <span class="sub">n8n workflow · 9 agents · HITL 4 게이트 · 병렬 2구간 · 재작업 루프 2</span>
+    <div class="spacer"></div>
+    <span class="badge">▶ Manual Trigger</span>
+    <span class="badge">반자동 + 병렬</span>
+  </div>
+
+  <div class="canvas-wrap">
+    <div class="canvas" id="canvas">
+      <svg class="edges" id="edges">
+        <defs>
+          <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#9fa0b4"/></marker>
+          <marker id="arrowLoop" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#ff5a5f"/></marker>
+          <marker id="arrowTrue" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#23b26d"/></marker>
+        </defs>
+      </svg>
+      <div class="stage" style="left:30px;top:80px">① 기획 PLANNING (브리프·리서치·검증·설계·평가)</div>
+      <div class="stage" style="left:760px;top:560px">② 디자인·제작 PRODUCTION</div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <h4>Legend</h4>
+    <div class="row"><span class="sw" style="background:var(--trigger)"></span> Trigger (입력)</div>
+    <div class="row"><span class="sw" style="background:var(--ai)"></span> AI Agent (서브에이전트)</div>
+    <div class="row"><span class="sw" style="background:var(--logic)"></span> IF (점수 분기)</div>
+    <div class="row"><span class="sw" style="background:var(--hitl)"></span> Form (HITL 승인)</div>
+    <div class="row"><span class="sw" style="background:var(--code)"></span> Code (python-pptx)</div>
+    <div class="row"><span class="sw" style="background:var(--output)"></span> Output (산출물)</div>
+    <div class="row"><span class="sw" style="background:rgba(123,92,255,.15);border:1.5px dashed #b6a8ff"></span> ⚡ 병렬 실행 구간</div>
+    <div class="row"><span style="width:22px;border-top:2px dashed var(--loop)"></span> 미달 → 재작업 (max 3)</div>
+  </div>
+
+<script>
+const W=212, H=76;
+const TYPE={trigger:'#ff6d5a',ai:'#7b5cff',logic:'#1fb8a6',code:'#3f7bff',hitl:'#ff9d3c',output:'#23b26d'};
+const ICON={trigger:'▶',ai:'✦',logic:'?',code:'{ }',hitl:'✋',output:'✓'};
+
+const pboxes=[
+ {x:810,y:170,w:520,h:330,tag:'⚡ 병렬 P-A · 리서치 ∥ 디자인분석'},
+ {x:810,y:610,w:300,h:320,tag:'⚡ 병렬 P-C · 디자인 ∥ 이미지생성'},
+];
+
+const nodes=[
+ {id:'t',  x:40,  y:300,type:'trigger',title:'주제·자료 입력',sub:'Manual / Chat Trigger'},
+ {id:'in', x:300, y:300,type:'ai',title:'① Intake',sub:'발표 브리프 → brief.md',model:'sonnet'},
+ {id:'g0', x:560, y:300,type:'hitl',title:'Gate 0 · 브리프 확정',sub:'HITL 승인'},
+ {id:'rs', x:830, y:200,type:'ai',title:'② Researcher',sub:'콘텐츠·데이터부록 → research.md',model:'sonnet',skill:'insane-search'},
+ {id:'da', x:830, y:400,type:'ai',title:"②' Design-Analyst",sub:'애셋 디자인분석 → design-ref.md',model:'sonnet',skill:'insane-design'},
+ {id:'fc', x:1100,y:200,type:'ai',title:'③ Fact-Check',sub:'수치·출처 검증 → factcheck.md',model:'sonnet',skill:'insane-search'},
+ {id:'pl', x:1370,y:300,type:'ai',title:'④ Planner',sub:'기획·발표자노트 → plan.md·script.md',model:'opus'},
+ {id:'rv', x:1640,y:300,type:'ai',title:'⑤ Reviewer',sub:'기획안 다관점 평가 → review.md',model:'opus'},
+ {id:'ifA',x:1910,y:300,type:'logic',title:'기획안 ≥ 80?',sub:'IF · 출처 hard-fail'},
+ {id:'g1', x:2180,y:300,type:'hitl',title:'Gate 1 · 기획안 확정',sub:'HITL 승인'},
+
+ {id:'ds', x:830, y:640,type:'ai',title:'⑥ Designer',sub:'디자인 3안(+design-ref)',model:'sonnet',skill:'pptx-design-styles'},
+ {id:'ig', x:830, y:840,type:'ai',title:'⑦ Imagegen',sub:'이미지 생성 → assets/generated',model:'sonnet',skill:'Codex'},
+ {id:'g23',x:1100,y:640,type:'hitl',title:'Gate 2+3 · 디자인·요소',sub:'디자인 택1 + 폰트·로고·이미지'},
+ {id:'bd', x:1370,y:740,type:'code',title:'⑧ python-pptx 제작',sub:'Code · output_vN.pptx'},
+ {id:'ins',x:1640,y:740,type:'ai',title:'⑨ Inspector',sub:'6축 검수(정부양식·접근성)',model:'opus',skill:'LibreOffice'},
+ {id:'ifB',x:1910,y:740,type:'logic',title:'산출물 ≥ 85?',sub:'IF · 치명결함 점검'},
+ {id:'g4', x:2180,y:740,type:'hitl',title:'Gate 4 · 최종 인수',sub:'HITL 승인'},
+ {id:'done',x:2180,y:940,type:'output',title:'완료 · output.pptx',sub:'+ script.md · decisions.md'},
+];
+const N=Object.fromEntries(nodes.map(n=>[n.id,n]));
+
+const edges=[
+ {f:'t',t:'in',r:'h'},{f:'in',t:'g0',r:'h'},
+ {f:'g0',t:'rs',r:'h'},{f:'g0',t:'da',r:'h'},
+ {f:'rs',t:'fc',r:'h'},
+ {f:'fc',t:'pl',r:'h'},{f:'da',t:'pl',r:'h'},
+ {f:'pl',t:'rv',r:'h'},{f:'rv',t:'ifA',r:'h'},
+ {f:'ifA',t:'g1',r:'h',label:'통과 ≥80',cls:'true'},
+ {f:'ifA',t:'pl',r:'loopTop',label:'미달 → 재작성 · 최대 3회',cls:'false'},
+ {f:'g1',t:'ds',r:'wrap'},{f:'g1',t:'ig',r:'wrap'},
+ {f:'ds',t:'g23',r:'h'},{f:'g23',t:'bd',r:'h'},{f:'ig',t:'bd',r:'h'},
+ {f:'bd',t:'ins',r:'h'},{f:'ins',t:'ifB',r:'h'},
+ {f:'ifB',t:'g4',r:'h',label:'통과 ≥85',cls:'true'},
+ {f:'ifB',t:'ds',r:'loopBottom',label:'미달 → 재제작 · 최대 3회',cls:'false'},
+ {f:'g4',t:'done',r:'down'},
+];
+
+const aR=n=>[n.x+W,n.y+H/2], aL=n=>[n.x,n.y+H/2], aT=n=>[n.x+W/2,n.y], aB=n=>[n.x+W/2,n.y+H];
+function path(e){
+  const A=N[e.f],B=N[e.t]; let s,en,c1,c2,mid;
+  if(e.r==='h'){ s=aR(A);en=aL(B); const dx=Math.max(60,(en[0]-s[0])*0.5); c1=[s[0]+dx,s[1]];c2=[en[0]-dx,en[1]]; }
+  else if(e.r==='down'){ s=aB(A);en=aT(B); const dy=(en[1]-s[1])*0.5; c1=[s[0],s[1]+dy];c2=[en[0],en[1]-dy]; }
+  else if(e.r==='wrap'){ s=aB(A);en=aT(B); const dy=(en[1]-s[1]); c1=[s[0],s[1]+dy*0.55];c2=[en[0],en[1]-dy*0.55]; }
+  else if(e.r==='loopTop'){ s=aT(A);en=aT(B); const up=Math.min(s[1],en[1])-95; c1=[s[0],up];c2=[en[0],up]; mid=[(s[0]+en[0])/2,up+8]; }
+  else if(e.r==='loopBottom'){ s=aB(A);en=aB(B); const dn=Math.max(s[1],en[1])+120; c1=[s[0],dn];c2=[en[0],dn]; mid=[(s[0]+en[0])/2,dn-8]; }
+  return {d:`M${s[0]},${s[1]} C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${en[0]},${en[1]}`, mid:mid||[(s[0]+en[0])/2,(s[1]+en[1])/2]};
+}
+
+const canvas=document.getElementById('canvas'), svg=document.getElementById('edges');
+pboxes.forEach(b=>{ const d=document.createElement('div'); d.className='pbox';
+  d.style.left=b.x+'px';d.style.top=b.y+'px';d.style.width=b.w+'px';d.style.height=b.h+'px';
+  d.innerHTML=`<span class="ptag">${b.tag}</span>`; canvas.appendChild(d); });
+
+edges.forEach(e=>{
+  const {d,mid}=path(e); const loop=e.cls==='false';
+  const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+  p.setAttribute('d',d);p.setAttribute('fill','none');
+  p.setAttribute('stroke',loop?'#ff5a5f':(e.cls==='true'?'#23b26d':'#9fa0b4'));
+  p.setAttribute('stroke-width',loop?'2':'2.4');
+  if(loop)p.setAttribute('stroke-dasharray','7 6');
+  p.setAttribute('marker-end',loop?'url(#arrowLoop)':(e.cls==='true'?'url(#arrowTrue)':'url(#arrow)'));
+  svg.appendChild(p);
+  if(e.label){ const l=document.createElement('div'); l.className='elabel '+(e.cls||'');
+    l.textContent=e.label;l.style.left=mid[0]+'px';l.style.top=mid[1]+'px';canvas.appendChild(l); }
+});
+
+nodes.forEach(n=>{
+  const el=document.createElement('div'); el.className='node'; el.style.left=n.x+'px'; el.style.top=n.y+'px';
+  const chips=`${n.model?`<span class="chip ${n.model}">${n.model==='opus'?'Opus 4.8':'Sonnet 4.6'}</span>`:''}${n.skill?`<span class="chip skill">${n.skill}</span>`:''}`;
+  el.innerHTML=`<div class="icon" style="background:${TYPE[n.type]}">${ICON[n.type]}</div>
+    <div class="body"><div class="title">${n.title}</div><div class="sub">${n.sub}</div>
+    ${chips?`<div class="chips">${chips}</div>`:''}</div>`;
+  canvas.appendChild(el);
+});
+</script>
+</body>
+</html>
